@@ -1,0 +1,13 @@
+file,szamlaszam,kibocsatas_datum,teljesites_datum,hatarido,fizmod,elado_nev,elado_adoszam,vevo_nev,vevo_adoszam,afa_kulcs,netto_osszeg,afa_osszeg,brutto_osszeg,valuta,tetelszam
+szamla_01.pdf,ALG-1001,2025-02-02,2025-01-29,2025-02-16,Átutalás,Lengyel és Tóth Kht.,95822412-2-13,Nagy és Nagy Kkt.,83197857-2-85,0,244000,0,244000,HUF,2
+szamla_02.pdf,ALG-1002,2025-01-23,2025-01-21,2025-02-22,Átutalás,Varga Nagy Kft.,70291817-5-10,Deák és társa Kkt.,38898923-6-23,0,79800,0,79800,HUF,3
+szamla_03.pdf,ALG-1003,2025-01-12,2025-01-07,2025-01-20,Átutalás,Németh Zrt.,19335534-1-94,Molnár és Balogh Nyrt.,61019678-5-68,27,124600,33642,158242,HUF,2
+szamla_04.pdf,ALG-1004,2024-12-29,2024-12-25,2025-01-12,Készpénz,Pál és társa Kft.,72043515-7-44,Kiss és Simon Bt.,14308421-6-61,0,363100,0,363100,HUF,4
+szamla_05.pdf,ALG-1005,2024-12-12,2024-12-09,2024-12-20,Készpénz,Balogh Nemes Kkt.,39436733-3-75,Rácz és Juhász Kht.,94214382-3-97,27,164600,44442,209042,HUF,3
+szamla_06.pdf,ALG-1006,2024-11-15,2024-11-10,2024-11-29,Átutalás,Balogh Kkt.,10435578-5-74,Kis Varga Zrt.,91734598-4-29,27,46700,12609,59309,HUF,3
+szamla_07.pdf,ALG-1007,2024-11-05,2024-11-05,2024-12-05,Bankkártya,Kovács és Kovács Zrt.,81498611-3-26,Király Zrt.,91415657-7-37,27,186500,50355,236855,HUF,4
+szamla_08.pdf,ALG-1008,2024-11-17,2024-11-17,2024-12-01,Bankkártya,Nagy és Fekete Zrt.,17901903-4-18,Balázs és Boros Kkt.,47376585-8-37,0,151900,0,151900,HUF,4
+szamla_09.pdf,ALG-1009,2024-11-26,2024-11-23,2024-12-10,Készpénz,Lukács Zrt.,55540424-2-41,Tóth és Székely Kkt.,66623995-3-45,27,25000,6750,31750,HUF,1
+szamla_10.pdf,ALG-1010,2024-11-12,2024-11-12,2024-12-12,Készpénz,Molnár és Török Kft.,38688676-7-17,Kovács Kkt.,71070189-5-64,5,44900,2245,47145,HUF,2
+szamla_11.pdf,ALG-1011,2025-01-10,2025-01-08,2025-01-24,Átutalás,Nagy és társa Kft.,77491435-9-30,Horváth és Kovács Nyrt.,89864260-2-96,0,174500,0,174500,HUF,1
+szamla_12.pdf,ALG-1012,2024-12-13,2024-12-09,2025-01-12,Bankkártya,Fábián és Varga Zrt.,99889098-6-40,Szabó és Lukács Bt.,52436584-2-11,0,64600,0,64600,HUF,3
