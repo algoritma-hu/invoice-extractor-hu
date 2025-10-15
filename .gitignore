@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.ocr.pdf
+invoices_hu/*.pdf
+invoices_hu/*.txt
+extracted_invoices*.csv
