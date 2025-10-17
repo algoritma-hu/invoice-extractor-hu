@@ -1,0 +1,328 @@
+327
+import os, random, csv
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from faker import Faker
+import numpy as np
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+OUT_DIR = "invoices_hu"
+N_FILES = 20
+random.seed(42); np = __import__("numpy"); np.random.seed(42)
+fake = Faker("hu_HU")
+
+FONT = "DejaVu"; FONT_BOLD = "DejaVu-Bold"
+pdfmetrics.registerFont(TTFont(FONT, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
+pdfmetrics.registerFont(TTFont(FONT_BOLD, "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
+
+os.makedirs(OUT_DIR, exist_ok=True)
+VAT_RATES = [27, 5, 0]
+
+def rnd_items():
+    n = random.randint(1, 5)
+    items = []
+    for _ in range(n):
+        qty = random.choice([1,2,3,5,10])
+        unit = random.choice([2500,4500,9900,12500,19900,34900])
+        name = random.choice([
+            "Tanácsadás óradíj","Rendszerkarbantartás","Szoftver modul licenc",
+            "Adatrögzítés","Helyszíni kiszállás","Oktatás (fél nap)"
+        ])
+        items.append((name, qty, unit))
+    return items
+
+def hu_currency(x):
+    return f"{int(round(x)):,.0f}".replace(",", " ").replace("\xa0", " ") + " Ft"
+
+def make_company():
+    return {
+        "nev": fake.company(),
+        "adoszam": f"{random.randint(10000000,99999999)}-{random.randint(1,9)}-{random.randint(10,99)}",
+        "cim": f"{fake.postcode()} {fake.city()}, {fake.street_address()}",
+        "iban": f"HU{random.randint(10,99)}{random.randint(1000,9999)}{random.randint(1000,9999)}{random.randint(1000,9999)}{random.randint(1000,9999)}"
+    }
+
+def draw_watermark(c, text, w, h):
+    c.saveState(); c.setFont(FONT_BOLD, 80); c.setFillGray(0.9)
+    c.translate(w/2, h/2); c.rotate(30); c.drawCentredString(0,0,text); c.restoreState()
+
+def render_table(c, x, y, items, vat_rate):
+    c.setFont(FONT_BOLD, 10)
+    c.drawString(x, y, "Tétel megnevezése")
+    c.drawString(x+90*mm, y, "Menny.")
+    c.drawString(x+110*mm, y, "Egységár (nettó)")
+    c.drawString(x+155*mm, y, "Nettó összeg")
+    c.setFont(FONT, 10); y -= 6*mm
+    netto_sum = 0
+    for name, qty, unit in items:
+        netto = qty*unit; netto_sum += netto
+        c.drawString(x, y, name)
+        c.drawRightString(x+104*mm, y, f"{qty} db")
+        c.drawRightString(x+150*mm, y, hu_currency(unit))
+        c.drawRightString(x+190*mm, y, hu_currency(netto))
+        y -= 6*mm
+    afa = netto_sum * vat_rate / 100.0
+    brutto = netto_sum + afa
+    y -= 4*mm; c.setFont(FONT_BOLD, 10)
+    c.drawRightString(x+190*mm, y, f"Nettó: {hu_currency(netto_sum)}"); y -= 6*mm
+    c.drawRightString(x+190*mm, y, f"ÁFA ({vat_rate}%): {hu_currency(afa)}"); y -= 6*mm
+    c.drawRightString(x+190*mm, y, f"Végösszeg (bruttó): {hu_currency(brutto)}")
+    return netto_sum, afa, brutto
+
+def layout_A(path, hdr, seller, buyer, items, vat_rate):
+    c = canvas.Canvas(path, pagesize=A4); w,h = A4
+    draw_watermark(c, "MINTA / SAMPLE", w, h)
+    c.setFont(FONT_BOLD, 18); c.drawString(20*mm, 270*mm, "SZÁMLA")
+    c.setFont(FONT, 10)
+    c.drawString(20*mm, 262*mm, f"Számlaszám: {hdr['szamla']}")
+    c.drawString(20*mm, 256*mm, f"Kibocsátás dátuma: {hdr['kibocsatas']}")
+    c.drawString(20*mm, 250*mm, f"Teljesítés dátuma: {hdr['teljesites']}")
+    c.drawString(20*mm, 244*mm, f"Fizetési határidő: {hdr['hatarido']}")
+    c.drawString(20*mm, 238*mm, f"Fizetési mód: {hdr['fizmod']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(20*mm, 226*mm, "Eladó (Kibocsátó)")
+    c.setFont(FONT, 10)
+    c.drawString(20*mm, 221*mm, seller["nev"])
+    c.drawString(20*mm, 216*mm, f"Adószám: {seller['adoszam']}")
+    c.drawString(20*mm, 211*mm, seller["cim"])
+    c.drawString(20*mm, 206*mm, f"Bankszámla (IBAN): {seller['iban']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(120*mm, 226*mm, "Vevő")
+    c.setFont(FONT, 10)
+    c.drawString(120*mm, 221*mm, buyer["nev"])
+    c.drawString(120*mm, 216*mm, f"Adószám: {buyer['adoszam']}")
+    c.drawString(120*mm, 211*mm, buyer["cim"])
+    c.setFont(FONT, 10); c.drawString(20*mm, 198*mm, f"ÁFA kulcs: {vat_rate}%")
+    render_table(c, 20*mm, 190*mm, items, vat_rate)
+    c.setFont(FONT, 9)
+    c.drawString(20*mm, 20*mm, "Megjegyzés: Minta számla bemutató célokra, nem minősül valódi bizonylatnak.")
+    c.showPage(); c.save()
+
+def layout_B(path, hdr, seller, buyer, items, vat_rate):
+    c = canvas.Canvas(path, pagesize=landscape(A4)); w,h = landscape(A4)
+    draw_watermark(c, "MINTA / SAMPLE", w, h)
+    c.setFont(FONT_BOLD, 18); c.drawString(15*mm, h-20*mm, "SZÁMLA")
+    c.setFont(FONT, 10)
+    c.drawString(15*mm, h-28*mm, f"Számlaszám: {hdr['szamla']}  |  Kelt: {hdr['kibocsatas']}  |  Teljesítés: {hdr['teljesites']}  |  Határidő: {hdr['hatarido']}  |  {hdr['fizmod']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(15*mm, h-40*mm, "Eladó"); c.setFont(FONT, 10)
+    c.drawString(15*mm, h-46*mm, f"{seller['nev']}  •  Adószám: {seller['adoszam']}  •  {seller['cim']}  •  IBAN: {seller['iban']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(15*mm, h-58*mm, "Vevő"); c.setFont(FONT, 10)
+    c.drawString(15*mm, h-64*mm, f"{buyer['nev']}  •  Adószám: {buyer['adoszam']}  •  {buyer['cim']}")
+    c.setFont(FONT, 10); c.drawString(15*mm, h-76*mm, f"ÁFA kulcs: {vat_rate}%")
+    render_table(c, 15*mm, h-86*mm, items, vat_rate)
+    c.setFont(FONT, 9); c.drawString(15*mm, 10*mm, "Megjegyzés: Minta számla bemutató célokra.")
+    c.showPage(); c.save()
+
+def main():
+    truth = []
+    base_date = datetime(2024, 11, 5)
+    for i in range(1, N_FILES+1):
+        seller, buyer = make_company(), make_company()
+        items = rnd_items()
+        vat = random.choice(VAT_RATES)
+        issue = base_date + relativedelta(days=random.randint(0,120))
+        perf  = issue - timedelta(days=random.randint(0,5))
+        due   = issue + timedelta(days=random.choice([8,14,30]))
+        hdr = {
+            "szamla": f"ALG-{1000+i}",
+            "kibocsatas": issue.strftime("%Y-%m-%d"),
+            "teljesites": perf.strftime("%Y-%m-%d"),
+            "hatarido": due.strftime("%Y-%m-%d"),
+            "fizmod": random.choice(["Átutalás","Készpénz","Bankkártya"])
+        }
+        path = os.path.join(OUT_DIR, f"szamla_{i:02d}.pdf")
+        (layout_B if i % 2 else layout_A)(path, hdr, seller, buyer, items, vat)
+
+        netto = sum(q*u for _,q,u in items)
+        afa = int(round(netto*vat/100.0))
+        brutto = netto + afa
+        truth.append({
+            "file": os.path.basename(path),
+            "szamlaszam": hdr["szamla"],
+            "kibocsatas_datum": hdr["kibocsatas"],
+            "teljesites_datum": hdr["teljesites"],
+            "hatarido": hdr["hatarido"],
+            "fizmod": hdr["fizmod"],
+            "elado_nev": seller["nev"],
+            "elado_adoszam": seller["adoszam"],
+            "vevo_nev": buyer["nev"],
+            "vevo_adoszam": buyer["adoszam"],
+            "afa_kulcs": vat,
+            "netto_osszeg": netto,
+            "afa_osszeg": afa,
+            "brutto_osszeg": brutto,
+            "valuta": "HUF",
+            "tetelszam": len(items)
+        })
+    with open(os.path.join(OUT_DIR, "ground_truth.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(truth[0].keys()))
+        w.writeheader(); w.writerows(truth)
+    print(f"Generated {N_FILES} invoices → {OUT_DIR}")
+    print(f"Ground truth → {os.path.join(OUT_DIR, 'ground_truth.csv')}")
+
+if __name__ == "__main__":
+    main()
+import os, random, csv
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from faker import Faker
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+OUT_DIR = "invoices_hu"
+N_FILES = 20
+random.seed(42)
+fake = Faker("hu_HU")
+
+# Fonts with Hungarian diacritics
+FONT = "DejaVu"
+FONT_BOLD = "DejaVu-Bold"
+pdfmetrics.registerFont(TTFont(FONT, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
+pdfmetrics.registerFont(TTFont(FONT_BOLD, "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
+
+os.makedirs(OUT_DIR, exist_ok=True)
+VAT_RATES = [27, 5, 0]
+
+def rnd_items():
+    n = random.randint(1, 5)
+    items = []
+    for _ in range(n):
+        qty = random.choice([1,2,3,5,10])
+        unit = random.choice([2500,4500,9900,12500,19900,34900])
+        name = random.choice([
+            "Tanácsadás óradíj","Rendszerkarbantartás","Szoftver modul licenc",
+            "Adatrögzítés","Helyszíni kiszállás","Oktatás (fél nap)"
+        ])
+        items.append((name, qty, unit))
+    return items
+
+def hu_currency(x):
+    return f"{int(round(x)):,.0f}".replace(",", " ").replace("\xa0", " ") + " Ft"
+
+def make_company():
+    return {
+        "nev": fake.company(),
+        "adoszam": f"{random.randint(10000000,99999999)}-{random.randint(1,9)}-{random.randint(10,99)}",
+        "cim": f"{fake.postcode()} {fake.city()}, {fake.street_address()}",
+        "iban": f"HU{random.randint(10,99)}{random.randint(1000,9999)}{random.randint(1000,9999)}{random.randint(1000,9999)}{random.randint(1000,9999)}"
+    }
+
+def draw_watermark(c, text, w, h):
+    c.saveState()
+    c.setFont(FONT_BOLD, 80)
+    c.setFillGray(0.9)
+    c.translate(w/2, h/2)
+    c.rotate(30)
+    c.drawCentredString(0,0,text)
+    c.restoreState()
+
+def render_table(c, x, y, items, vat_rate):
+    c.setFont(FONT_BOLD, 10)
+    c.drawString(x, y, "Tétel megnevezése")
+    c.drawString(x+90*mm, y, "Menny.")
+    c.drawString(x+110*mm, y, "Egységár (nettó)")
+    c.drawString(x+155*mm, y, "Nettó összeg")
+    c.setFont(FONT, 10)
+    y -= 6*mm
+    netto_sum = 0
+    for name, qty, unit in items:
+        netto = qty*unit
+        netto_sum += netto
+        c.drawString(x, y, name)
+        c.drawRightString(x+104*mm, y, f"{qty} db")
+        c.drawRightString(x+150*mm, y, hu_currency(unit))
+        c.drawRightString(x+190*mm, y, hu_currency(netto))
+        y -= 6*mm
+    afa = netto_sum * vat_rate / 100.0
+    brutto = netto_sum + afa
+    y -= 4*mm
+    c.setFont(FONT_BOLD, 10)
+    c.drawRightString(x+190*mm, y, f"Nettó: {hu_currency(netto_sum)}")
+    y -= 6*mm
+    c.drawRightString(x+190*mm, y, f"ÁFA ({vat_rate}%): {hu_currency(afa)}")
+    y -= 6*mm
+    c.drawRightString(x+190*mm, y, f"Végösszeg (bruttó): {hu_currency(brutto)}")
+    return netto_sum, afa, brutto
+
+def layout_A(path, hdr, seller, buyer, items, vat_rate):
+    c = canvas.Canvas(path, pagesize=A4)
+    w, h = A4
+    draw_watermark(c, "MINTA / SAMPLE", w, h)
+    c.setFont(FONT_BOLD, 18); c.drawString(20*mm, 270*mm, "SZÁMLA")
+    c.setFont(FONT, 10)
+    c.drawString(20*mm, 262*mm, f"Számlaszám: {hdr['szamla']}")
+    c.drawString(20*mm, 256*mm, f"Kibocsátás dátuma: {hdr['kibocsatas']}")
+    c.drawString(20*mm, 250*mm, f"Teljesítés dátuma: {hdr['teljesites']}")
+    c.drawString(20*mm, 244*mm, f"Fizetési határidő: {hdr['hatarido']}")
+    c.drawString(20*mm, 238*mm, f"Fizetési mód: {hdr['fizmod']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(20*mm, 226*mm, "Eladó (Kibocsátó)")
+    c.setFont(FONT, 10)
+    c.drawString(20*mm, 221*mm, seller["nev"])
+    c.drawString(20*mm, 216*mm, f"Adószám: {seller['adoszam']}")
+    c.drawString(20*mm, 211*mm, seller["cim"])
+    c.drawString(20*mm, 206*mm, f"Bankszámla (IBAN): {seller['iban']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(120*mm, 226*mm, "Vevő")
+    c.setFont(FONT, 10)
+    c.drawString(120*mm, 221*mm, buyer["nev"])
+    c.drawString(120*mm, 216*mm, f"Adószám: {buyer['adoszam']}")
+    c.drawString(120*mm, 211*mm, buyer["cim"])
+    c.setFont(FONT, 10); c.drawString(20*mm, 198*mm, f"ÁFA kulcs: {vat_rate}%")
+    render_table(c, 20*mm, 190*mm, items, vat_rate)
+    c.setFont(FONT, 9)
+    c.drawString(20*mm, 20*mm, "Megjegyzés: Minta számla bemutató célokra, nem minősül valódi bizonylatnak.")
+    c.showPage(); c.save()
+
+def layout_B(path, hdr, seller, buyer, items, vat_rate):
+    c = canvas.Canvas(path, pagesize=landscape(A4))
+    w, h = landscape(A4)
+    draw_watermark(c, "MINTA / SAMPLE", w, h)
+    c.setFont(FONT_BOLD, 18); c.drawString(15*mm, h-20*mm, "SZÁMLA")
+    c.setFont(FONT, 10)
+    c.drawString(15*mm, h-28*mm, f"Számlaszám: {hdr['szamla']}  |  Kelt: {hdr['kibocsatas']}  |  Teljesítés: {hdr['teljesites']}  |  Határidő: {hdr['hatarido']}  |  {hdr['fizmod']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(15*mm, h-40*mm, "Eladó"); c.setFont(FONT, 10)
+    c.drawString(15*mm, h-46*mm, f"{seller['nev']}  •  Adószám: {seller['adoszam']}  •  {seller['cim']}  •  IBAN: {seller['iban']}")
+    c.setFont(FONT_BOLD, 12); c.drawString(15*mm, h-58*mm, "Vevő"); c.setFont(FONT, 10)
+    c.drawString(15*mm, h-64*mm, f"{buyer['nev']}  •  Adószám: {buyer['adoszam']}  •  {buyer['cim']}")
+    c.setFont(FONT, 10); c.drawString(15*mm, h-76*mm, f"ÁFA kulcs: {vat_rate}%")
+    render_table(c, 15*mm, h-86*mm, items, vat_rate)
+    c.setFont(FONT, 9); c.drawString(15*mm, 10*mm, "Megjegyzés: Minta számla bemutató célokra.")
+    c.showPage(); c.save()
+
+def main():
+    truth = []
+    base_date = datetime(2024, 11, 5)
+    for i in range(1, N_FILES+1):
+        seller, buyer = make_company(), make_company()
+        items = rnd_items()
+        vat = random.choice(VAT_RATES)
+        issue = base_date + relativedelta(days=random.randint(0,120))
+        perf  = issue - timedelta(days=random.randint(0,5))
+        due   = issue + timedelta(days=random.choice([8,14,30]))
+        hdr = {
+            "szamla": f"ALG-{1000+i}",
+            "kibocsatas": issue.strftime("%Y-%m-%d"),
+            "teljesites": perf.strftime("%Y-%m-%d"),
+            "hatarido": due.strftime("%Y-%m-%d"),
+            "fizmod": random.choice(["Átutalás","Készpénz","Bankkártya"])
+        }
+        path = os.path.join(OUT_DIR, f"szamla_{i:02d}.pdf")
+        (layout_B if i % 2 else layout_A)(path, hdr, seller, buyer, items, vat)
+
+        netto = sum(q*u for _, q, u in items)
+        afa = int(round(netto * vat / 100.0))
+        brutto = netto + afa
+        truth.append({
+            "file": os.path.basename(path),
+            "szamlaszam": hdr["szamla"],
+            "kibocsatas_datum": hdr["kibocsatas"],
+            "teljesites_datum": hdr["teljesites"],
+            "hatarido": hdr["hatarido"],
+            "fizmod": hdr["fizmod"],
+            "elado_nev": seller["nev"],
+            "elado_adoszam": seller["adoszam"],
+            "vevo_nev": buyer["nev]()_

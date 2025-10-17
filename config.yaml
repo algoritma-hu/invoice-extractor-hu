@@ -1,0 +1,19 @@
+paths:
+  inbox: "./samples"
+  out_root: "./out"
+routing:
+  invoices: "invoices"
+  receipts: "receipts"
+  other: "other"
+notify:
+  enabled: false
+  mail_to: "you@example.com"
+  mail_from: "middleware-demo@local"
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+  use_tls: true
+  username: "your_gmail_username"
+  password_env: "SMTP_PASS"   # read from env var if notify.enabled=true
+run:
+  continuous: false           # process once by default
+  dry_run: true               # log only, no moves by default
